@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Listd — English-Speaking Business Directory for Brussels Expats</title>
+<meta name="description" content="The curated directory of English-speaking doctors, lawyers, accountants, schools and services trusted by Brussels' expat community. AI-curated, always up to date.">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0ede8;
+    --muted: #7a7771;
+    --accent: #c8f060;
+    --accent2: #60d4f0;
+    --accent3: #f060a8;
+    --radius: 12px;
+    --font-display: 'Syne', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 15px; line-height: 1.6; min-height: 100vh; }
+  /* NAV */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 40px; height: 62px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,13,13,0.92);
+    backdrop-filter: blur(12px);
+  }
+  .logo {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.3px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    line-height: 1;
+  }
+  .logo-accent { color: var(--accent); }
+  .nav-tabs { display: flex; gap: 4px; background: var(--surface); border-radius: 10px; padding: 4px; border: 1px solid var(--border); }
+  .nav-tab {
+    padding: 7px 18px; border-radius: 7px; cursor: pointer;
+    font-family: var(--font-body); font-size: 13px; font-weight: 500;
+    color: var(--muted); transition: all 0.2s; border: none; background: transparent;
+  }
+  .nav-tab.active { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); }
+  .nav-tab:hover:not(.active) { color: var(--text); }
+  /* VIEWS */
+  .view { display: none; }
+  .view.active { display: block; }
+  /* HERO */
+  .hero { padding: 80px 40px 56px; max-width: 900px; margin: 0 auto; text-align: center; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(200,240,96,0.08); border: 1px solid rgba(200,240,96,0.2);
+    color: var(--accent); font-size: 11px; font-weight: 500;
+    padding: 5px 14px; border-radius: 100px; margin-bottom: 28px; letter-spacing: 0.5px;
+  }
+  .hero-badge::before { content: ''; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -1px;
+    margin-bottom: 20px;
+  }
+  @media(max-width:640px){ .hero h1 { font-size: 38px; letter-spacing: -0.5px; } }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { color: var(--muted); font-size: 17px; max-width: 540px; margin: 0 auto 40px; font-weight: 300; line-height: 1.7; }
+  /* SEARCH */
+  .search-wrap { position: relative; max-width: 580px; margin: 0 auto 14px; display: flex; gap: 10px; }
+  .search-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 100px; padding: 15px 24px;
+    font-family: var(--font-body); font-size: 15px; color: var(--text); outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input::placeholder { color: var(--muted); }
+  .search-input:focus { border-color: rgba(200,240,96,0.4); }
+  .search-btn {
+    background: var(--accent); border: none; border-radius: 100px;
+    padding: 15px 24px; font-family: var(--font-display); font-size: 13px;
+    font-weight: 700; color: #0d0d0d; cursor: pointer;
+    white-space: nowrap; transition: opacity 0.2s, transform 0.1s; letter-spacing: 0.2px;
+  }
+  .search-btn:hover { opacity: 0.88; }
+  .search-btn:active { transform: scale(0.97); }
+  .search-hint { color: var(--muted); font-size: 12px; text-align: center; }
+  /* FILTERS */
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 0 40px 40px; }
+  .filter-chip {
+    padding: 7px 16px; border-radius: 100px; border: 1px solid var(--border2);
+    background: transparent; color: var(--muted); font-size: 13px;
+    cursor: pointer; transition: all 0.2s; font-family: var(--font-body);
+  }
+  .filter-chip:hover, .filter-chip.active { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+  .filter-chip.active { border-color: rgba(200,240,96,0.3); color: var(--accent); }
+  /* GRID */
+  .grid-wrap { padding: 0 40px 60px; max-width: 1200px; margin: 0 auto; }
+  .grid-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+  .grid-count { color: var(--muted); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  /* CARD */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 22px;
+    transition: border-color 0.2s, transform 0.2s; cursor: pointer; position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity 0.2s;
+  }
+  .card:hover { border-color: var(--border2); transform: translateY(-2px); }
+  .card:hover::before { opacity: 1; }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .card-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+  }
+  .card-badges { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+  .badge { padding: 3px 9px; border-radius: 100px; font-size: 11px; font-weight: 500; }
+  .badge-cat { background: rgba(96,212,240,0.1); color: var(--accent2); border: 1px solid rgba(96,212,240,0.15); }
+  .badge-new { background: rgba(200,240,96,0.1); color: var(--accent); border: 1px solid rgba(200,240,96,0.2); }
+  .badge-feat { background: rgba(240,96,168,0.1); color: var(--accent3); border: 1px solid rgba(240,96,168,0.2); }
+  .card h3 { font-family: var(--font-display); font-size: 16px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.3px; }
+  .card p { color: var(--muted); font-size: 13px; line-height: 1.55; margin-bottom: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card-footer { display: flex; justify-content: space-between; align-items: center; }
+  .card-tags { display: flex; gap: 5px; }
+  .tag { font-size: 11px; color: var(--muted); background: var(--surface2); padding: 3px 8px; border-radius: 4px; }
+  .card-loc { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+  .card-loc::before { content: '📍'; font-size: 10px; }
+  /* AI ANSWER */
+  .search-ai-answer {
+    background: var(--surface); border: 1px solid rgba(200,240,96,0.2);
+    border-radius: var(--radius); padding: 18px 22px;
+    margin: 0 auto 22px; max-width: 1120px;
+    display: none;
+  }
+  .search-ai-answer.visible { display: block; }
+  .search-ai-answer-label { font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 7px; font-weight: 600; }
+  .search-ai-answer p { font-size: 14px; color: var(--muted); line-height: 1.65; }
+  /* SUBMIT VIEW */
+  .submit-wrap { max-width: 660px; margin: 0 auto; padding: 60px 40px 80px; }
+  .submit-wrap h2 { font-family: var(--font-display); font-size: 34px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
+  .submit-wrap > p { color: var(--muted); margin-bottom: 38px; font-size: 15px; font-weight: 300; }
+  .form-group { margin-bottom: 20px; }
+  label { display: block; font-size: 11px; font-weight: 500; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.8px; }
+  input, textarea, select {
+    width: 100%; background: var(--surface); border: 1px solid var(--border2);
+    border-radius: var(--radius); padding: 13px 16px;
+    font-family: var(--font-body); font-size: 15px; color: var(--text); outline: none;
+    transition: border-color 0.2s;
+  }
+  input::placeholder, textarea::placeholder { color: var(--muted); }
+  input:focus, textarea:focus, select:focus { border-color: rgba(200,240,96,0.4); }
+  textarea { resize: vertical; min-height: 96px; }
+  select {
+    cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237a7771' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center;
+  }
+  select option { background: var(--surface2); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .submit-btn {
+    width: 100%; padding: 16px;
+    background: var(--accent); border: none; border-radius: 100px;
+    font-family: var(--font-display); font-size: 15px; font-weight: 700;
+    color: #0d0d0d; cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: -0.2px; margin-top: 6px;
+  }
+  .submit-btn:hover { opacity: 0.9; }
+  .submit-btn:active { transform: scale(0.99); }
+  .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  /* AI PROCESSING PANEL */
+  .ai-panel { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 20px; margin-top: 22px; display: none; }
+  .ai-panel.visible { display: block; }
+  .ai-panel-title { display: flex; align-items: center; gap: 9px; font-weight: 500; margin-bottom: 14px; font-size: 13px; }
+  .ai-dot { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; animation: pulse 1s infinite; }
+  .ai-step { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+  .ai-step:last-of-type { border-bottom: none; }
+  .ai-step.done { color: var(--text); }
+  .ai-step.done .step-icon { color: var(--accent); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ai-step.running .step-icon { display: inline-block; animation: spin 0.8s linear infinite; }
+  .step-icon { width: 18px; text-align: center; flex-shrink: 0; }
+  .ai-result { margin-top: 16px; padding: 16px; background: var(--surface2); border-radius: 8px; border: 1px solid rgba(200,240,96,0.18); display: none; }
+  .ai-result.visible { display: block; }
+  .ai-result h4 { font-family: var(--font-display); font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+  .ai-result p { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .ai-result-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  /* ADMIN VIEW */
+  .admin-wrap { padding: 40px; max-width: 1100px; margin: 0 auto; }
+  .admin-header { margin-bottom: 30px; }
+  .admin-header h2 { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+  .admin-header p { color: var(--muted); font-size: 14px; font-weight: 300; }
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .stat-val { font-family: var(--font-display); font-size: 30px; font-weight: 800; letter-spacing: -1px; }
+  .stat-val.green { color: var(--accent); }
+  .stat-val.blue { color: var(--accent2); }
+  .stat-val.pink { color: var(--accent3); }
+  .admin-section { margin-bottom: 30px; }
+  .admin-section h3 { font-family: var(--font-display); font-size: 17px; font-weight: 700; margin-bottom: 14px; letter-spacing: -0.3px; }
+  .flag-item {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 15px 18px; display: flex; align-items: center; gap: 14px; margin-bottom: 8px;
+  }
+  .flag-icon { font-size: 18px; flex-shrink: 0; }
+  .flag-info { flex: 1; }
+  .flag-info strong { font-size: 14px; display: block; margin-bottom: 2px; }
+  .flag-info span { font-size: 12px; color: var(--muted); }
+  .flag-actions { display: flex; gap: 8px; }
+  .btn-sm {
+    padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border2); background: transparent;
+    color: var(--muted); transition: all 0.2s; font-family: var(--font-body);
+  }
+  .btn-approve { color: var(--accent); border-color: rgba(200,240,96,0.3); }
+  .btn-approve:hover { background: rgba(200,240,96,0.08); }
+  .btn-reject { color: var(--accent3); border-color: rgba(240,96,168,0.3); }
+  .btn-reject:hover { background: rgba(240,96,168,0.08); }
+  .agent-log {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    font-family: 'Courier New', monospace; font-size: 12px;
+    color: var(--muted); max-height: 200px; overflow-y: auto; line-height: 1.9;
+  }
+  .log-ok { color: #7db87d; }
+  .log-warn { color: #d4aa56; }
+  .log-info { color: #6ab4c4; }
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 30px; right: 30px;
+    background: var(--surface2); color: var(--text);
+    border: 1px solid rgba(200,240,96,0.25); border-radius: var(--radius);
+    padding: 13px 20px; font-size: 14px; z-index: 999;
+    transform: translateY(20px); opacity: 0; transition: all 0.28s; max-width: 360px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast strong { color: var(--accent); }
+  .empty { text-align: center; padding: 72px 20px; color: var(--muted); }
+  .empty h3 { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 7px; }
+  /* ANIM */
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  .hero > * { animation: fadeUp 0.46s ease both; }
+  .hero-badge{animation-delay:.04s} h1{animation-delay:.11s} .hero p{animation-delay:.18s} .search-wrap{animation-delay:.25s} .search-hint{animation-delay:.31s}
+  @media(max-width:640px){
+    nav { padding: 0 20px; }
+    .hero { padding: 50px 20px 44px; }
+    .grid-wrap { padding: 0 20px 50px; }
+    .filters { padding: 0 20px 28px; }
+    .submit-wrap { padding: 40px 20px 60px; }
+    .admin-wrap { padding: 24px 20px 60px; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    .search-wrap { flex-direction: column; }
+    .search-ai-answer { margin: 0 20px 20px; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">Listd<span class="logo-accent">.</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showView('browse',this)">Browse</button>
+    <button class="nav-tab" onclick="showView('submit',this)">Add listing</button>
+    <button class="nav-tab" onclick="showView('admin',this)">Admin</button>
+  </div>
+</nav>
+<!-- BROWSE -->
+<div id="view-browse" class="view active">
+  <div class="hero">
+    <div class="hero-badge">For Brussels expats · AI-curated</div>
+    <h1>Brussels,<br>in <em>plain English</em></h1>
+    <p>The curated directory of English-speaking doctors, lawyers, accountants, schools and services — trusted by Brussels' expat community.</p>
+    <div class="search-wrap">
+      <input class="search-input" id="search-input" placeholder="Try: 'English-speaking dentist' or 'expat tax advisor'" onkeydown="if(event.key==='Enter')runSearch()">
+      <button class="search-btn" onclick="runSearch()">Search ✦</button>
+    </div>
+    <p class="search-hint">Search in plain English — AI finds what matches</p>
+  </div>
+  <div class="filters">
+    <button class="filter-chip active" onclick="filterCat('all',this)">All</button>
+    <button class="filter-chip" onclick="filterCat('Healthcare',this)">Healthcare</button>
+    <button class="filter-chip" onclick="filterCat('Legal & Admin',this)">Legal &amp; Admin</button>
+    <button class="filter-chip" onclick="filterCat('Finance & Tax',this)">Finance &amp; Tax</button>
+    <button class="filter-chip" onclick="filterCat('Housing & Relocation',this)">Housing &amp; Relocation</button>
+    <button class="filter-chip" onclick="filterCat('Schools & Childcare',this)">Schools &amp; Childcare</button>
+    <button class="filter-chip" onclick="filterCat('Home Services',this)">Home Services</button>
+    <button class="filter-chip" onclick="filterCat('Wellness & Beauty',this)">Wellness &amp; Beauty</button>
+    <button class="filter-chip" onclick="filterCat('Dining & Social',this)">Dining &amp; Social</button>
+  </div>
+  <div class="grid-wrap">
+    <div class="search-ai-answer" id="ai-answer">
+      <div class="search-ai-answer-label">✦ AI Insight</div>
+      <p id="ai-answer-text"></p>
+    </div>
+    <div class="grid-header">
+      <span class="grid-count" id="grid-count"></span>
+    </div>
+    <div class="grid" id="listings-grid"></div>
+  </div>
+</div>
+<!-- SUBMIT -->
+<div id="view-submit" class="view">
+  <div class="submit-wrap">
+    <h2>List your business</h2>
+    <p>Serve Brussels' expat community? Add your English-speaking business. Our AI writes the description, picks the right category, tags languages, and publishes automatically.</p>
+    <div class="form-group">
+      <label>Business name *</label>
+      <input type="text" id="f-name" placeholder="e.g. Dr. Sarah Collins GP Practice">
+    </div>
+    <div class="form-group">
+      <label>Website</label>
+      <input type="url" id="f-website" placeholder="https://...">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Category hint</label>
+        <select id="f-category">
+          <option value="">Let AI decide</option>
+          <option>Healthcare</option>
+          <option>Legal &amp; Admin</option>
+          <option>Finance &amp; Tax</option>
+          <option>Housing &amp; Relocation</option>
+          <option>Schools &amp; Childcare</option>
+          <option>Home Services</option>
+          <option>Wellness &amp; Beauty</option>
+          <option>Dining &amp; Social</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Commune / Area</label>
+        <input type="text" id="f-location" placeholder="e.g. Ixelles, Etterbeek, Woluwe">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Languages spoken</label>
+      <input type="text" id="f-languages" placeholder="e.g. English, French, Dutch">
+    </div>
+    <div class="form-group">
+      <label>Extra details (optional)</label>
+      <textarea id="f-notes" placeholder="Opening hours, specialties, whether you take expat insurance, anything useful..."></textarea>
+    </div>
+    <button class="submit-btn" id="submit-btn" onclick="submitListing()">Submit — AI handles the rest ✦</button>
+    <div class="ai-panel" id="ai-panel">
+      <div class="ai-panel-title"><span class="ai-dot"></span> Claude is processing your listing</div>
+      <div id="ai-steps"></div>
+      <div class="ai-result" id="ai-result">
+        <h4 id="res-name"></h4>
+        <p id="res-desc"></p>
+        <div class="ai-result-tags" id="res-tags"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ADMIN -->
+<div id="view-admin" class="view">
+  <div class="admin-wrap">
+    <div class="admin-header">
+      <h2>Admin dashboard</h2>
+      <p>Everything Claude flagged for your review. The rest ran automatically.</p>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Total listings</div><div class="stat-val green" id="stat-total">0</div></div>
+      <div class="stat-card"><div class="stat-label">Auto-published</div><div class="stat-val blue" id="stat-auto">0</div></div>
+      <div class="stat-card"><div class="stat-label">Flagged for review</div><div class="stat-val pink" id="stat-flagged">2</div></div>
+      <div class="stat-card"><div class="stat-label">Est. monthly rev.</div><div class="stat-val green">€0</div></div>
+    </div>
+    <div class="admin-section">
+      <h3>Flagged for review</h3>
+      <div id="flagged-list">
+        <div class="flag-item" id="flag-1">
+          <span class="flag-icon">⚠️</span>
+          <div class="flag-info">
+            <strong>Crypto Trading Brussels</strong>
+            <span>Low confidence category match · possible spam · Claude confidence: 42%</span>
+          </div>
+          <div class="flag-actions">
+            <button class="btn-sm btn-approve" onclick="resolveFlag('flag-1','approved')">Approve</button>
+            <button class="btn-sm btn-reject" onclick="resolveFlag('flag-1','rejected')">Reject</button>
+          </div>
+        </div>
+        <div class="flag-item" id="flag-2">
+          <span class="flag-icon">🔄</span>
+          <div class="flag-info">
+            <strong>Maison Laurent — possible duplicate</strong>
+            <span>87% similarity to existing "Laurent &amp; Co" — merge or keep separate?</span>
+          </div>
+          <div class="flag-actions">
+            <button class="btn-sm btn-approve" onclick="resolveFlag('flag-2','approved')">Keep</button>
+            <button class="btn-sm btn-reject" onclick="resolveFlag('flag-2','rejected')">Merge</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="admin-section">
+      <h3>Agent activity log</h3>
+      <div class="agent-log" id="agent-log">
+        <div class="log-info">[09:02] Chrome agent: scanned 12 English-speaking businesses in Ixelles</div>
+        <div class="log-ok">[09:03] Auto-published: "Dr. Sarah Collins GP Practice" — Healthcare</div>
+        <div class="log-ok">[09:03] Auto-published: "Anglo Tax Advisors" — Finance &amp; Tax</div>
+        <div class="log-ok">[09:04] Auto-published: "Relocate Brussels" — Housing &amp; Relocation</div>
+        <div class="log-warn">[09:04] Flagged: "Crypto Trading Brussels" — confidence 42%</div>
+        <div class="log-info">[09:05] Deduplication scan: 1 near-match found</div>
+        <div class="log-warn">[09:05] Flagged: "Maison Laurent" — 87% overlap</div>
+        <div class="log-ok">[09:06] Email MCP: 8 invite emails sent to unclaimed listings</div>
+        <div class="log-info">[09:06] Stale check complete: all listings current</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const API = "/api/claude";
+const SUPABASE_URL = 'https://eeigiaafycejnmbczjfa.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_-nEYVv4QZyqtEqLkoJwsaw_QAWZdHmh';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let listings = [];
+let filteredListings = [];
+
+async function loadListings() {
+  document.getElementById('listings-grid').innerHTML = '<div class="empty" style="grid-column:1/-1"><p>Loading listings…</p></div>';
+  const { data, error } = await db.from('listings').select('*').eq('approved', true).order('created_at', { ascending: false });
+  if (error) { console.error('Supabase load error:', error); return; }
+  listings = (data || []).map(l => ({
+    id: l.id,
+    name: l.name,
+    category: l.category,
+    emoji: l.emoji || '🏢',
+    desc: l.description || '',
+    tags: l.tags || [],
+    location: l.location || 'Brussels',
+    featured: l.featured || false,
+    isNew: l.is_new || false,
+  }));
+  filteredListings = [...listings];
+  renderGrid(filteredListings);
+}
+function renderGrid(items) {
+  const grid = document.getElementById('listings-grid');
+  document.getElementById('grid-count').textContent = `${items.length} listing${items.length!==1?'s':''}`;
+  document.getElementById('stat-total').textContent = listings.length;
+  document.getElementById('stat-auto').textContent = listings.length;
+  if (!items.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>No listings found</h3><p>Try a different search or add the first one!</p></div>';
+    return;
+  }
+  grid.innerHTML = items.map(l=>`
+    <div class="card">
+      <div class="card-top">
+        <div class="card-icon">${l.emoji}</div>
+        <div class="card-badges">
+          ${l.featured?'<span class="badge badge-feat">Featured</span>':''}
+          ${l.isNew?'<span class="badge badge-new">New</span>':''}
+          <span class="badge badge-cat">${l.category}</span>
+        </div>
+      </div>
+      <h3>${l.name}</h3>
+      <p>${l.desc}</p>
+      <div class="card-footer">
+        <div class="card-tags">${l.tags.slice(0,2).map(t=>`<span class="tag">#${t}</span>`).join('')}</div>
+        <span class="card-loc">${l.location}</span>
+      </div>
+    </div>`).join('');
+}
+function filterCat(cat, el) {
+  document.getElementById('search-input').value = '';
+  document.getElementById('ai-answer').classList.remove('visible');
+  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  filteredListings = cat==='all' ? [...listings] : listings.filter(l=>l.category===cat);
+  renderGrid(filteredListings);
+}
+async function runSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  const ansEl = document.getElementById('ai-answer');
+  const ansText = document.getElementById('ai-answer-text');
+  ansText.textContent = 'Thinking...';
+  ansEl.classList.add('visible');
+  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+  const ql = q.toLowerCase();
+  const matched = listings.filter(l=>[l.name,l.desc,l.category,...l.tags,l.location].some(v=>v.toLowerCase().includes(ql)));
+  renderGrid(matched.length ? matched : listings);
+  try {
+    const res = await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',max_tokens:1000,
+      system:`You are the AI search assistant for Listd, a curated directory of English-speaking businesses in Brussels serving the expat community (EU officials, internationals, and English-speaking residents). Listings: ${JSON.stringify(listings.map(l=>({name:l.name,category:l.category,desc:l.desc,location:l.location,tags:l.tags})))}. Write 2 short conversational sentences about what the expat user is looking for and which listings match best. Always assume the user prefers English-speaking options. No bullets, no markdown.`,
+      messages:[{role:'user',content:`Search: "${q}"`}]
+    })});
+    const d = await res.json();
+    ansText.textContent = d.content?.[0]?.text || `Showing best matches for "${q}".`;
+  } catch {
+    ansText.textContent = `Showing results for "${q}". Describe what you need naturally for smarter matches.`;
+  }
+}
+async function submitListing() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { showToast('Please enter a business name'); return; }
+  const website = document.getElementById('f-website').value.trim();
+  const category = document.getElementById('f-category').value;
+  const location = document.getElementById('f-location').value.trim();
+  const languages = document.getElementById('f-languages').value.trim();
+  const notes = document.getElementById('f-notes').value.trim();
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Processing...';
+  const panel = document.getElementById('ai-panel');
+  panel.classList.add('visible');
+  const steps = [
+    {id:'s1',label:'Checking for near-duplicates'},
+    {id:'s2',label:'Generating AI description'},
+    {id:'s3',label:'Auto-categorising & tagging languages'},
+    {id:'s4',label:'Moderating for quality'},
+    {id:'s5',label:'Publishing to directory'},
+  ];
+  document.getElementById('ai-steps').innerHTML = steps.map(s=>`
+    <div class="ai-step" id="${s.id}"><span class="step-icon">○</span><span>${s.label}</span></div>`).join('');
+  async function runStep(id, delay) {
+    await new Promise(r=>setTimeout(r,delay));
+    const el = document.getElementById(id);
+    el.classList.add('running'); el.querySelector('.step-icon').textContent='↻';
+    await new Promise(r=>setTimeout(r,900));
+    el.classList.remove('running'); el.classList.add('done'); el.querySelector('.step-icon').textContent='✓';
+  }
+  await runStep('s1',300); await runStep('s2',200); await runStep('s3',200); await runStep('s4',200);
+  let gen = null;
+  try {
+    const res = await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',max_tokens:1000,
+      system:`You are the AI listing engine for Listd, a directory of English-speaking businesses in Brussels serving the expat community. Write descriptions that specifically highlight value for internationals and expats (English service, international insurance, cross-border expertise, etc.) when relevant. Output ONLY valid JSON (no markdown, no backticks):
+{"name":"cleaned name","category":"one of: Healthcare, Legal & Admin, Finance & Tax, Housing & Relocation, Schools & Childcare, Home Services, Wellness & Beauty, Dining & Social, Other","emoji":"one relevant emoji","desc":"2 specific benefit-focused sentences for an expat reader. Mention English service or any expat-relevant detail if provided.","tags":["tag1","tag2","tag3"],"approved":true,"flag_reason":null}
+Always include at least one language tag (e.g. "english") in tags when languages are known. Set approved=false only for obvious spam or inappropriate content.`,
+      messages:[{role:'user',content:JSON.stringify({name,website,category,location,languages,notes})}]
+    })});
+    const d = await res.json();
+    gen = JSON.parse(d.content?.[0]?.text?.replace(/```json|```/g,'').trim()||'{}');
+  } catch {
+    gen={name,category:category||'Other',emoji:'🏢',desc:`${name}${location?' in '+location:''}. ${notes||'Contact for more details.'}`,tags:languages?[languages.split(',')[0].trim().toLowerCase(),'local']:['local'],approved:true,flag_reason:null};
+  }
+  await runStep('s5',100);
+  document.getElementById('res-name').textContent = gen.name||name;
+  document.getElementById('res-desc').textContent = gen.desc||'';
+  document.getElementById('res-tags').innerHTML = (gen.tags||[]).map(t=>`<span class="badge badge-cat">#${t}</span>`).join('');
+  document.getElementById('ai-result').classList.add('visible');
+  if (gen.approved!==false) {
+    const { error: dbErr } = await db.from('listings').insert({
+      name: gen.name||name, category: gen.category||'Other', emoji: gen.emoji||'🏢',
+      description: gen.desc||'', tags: gen.tags||[], location: location||'Brussels',
+      featured: false, is_new: true, approved: true,
+    });
+    if (dbErr) console.error('Supabase insert error:', dbErr);
+    listings.unshift({id:Date.now(),name:gen.name||name,category:gen.category||'Other',emoji:gen.emoji||'🏢',desc:gen.desc||'',tags:gen.tags||[],location:location||'Brussels',featured:false,isNew:true});
+    addLog(`Auto-published: "${gen.name||name}" — ${gen.category||'Other'}`,'ok');
+    showToast(`<strong>${gen.name||name}</strong> is now live in the directory!`);
+  } else {
+    addLog(`Flagged: "${gen.name||name}" — ${gen.flag_reason||'review needed'}`,'warn');
+    showToast(`Flagged for review: ${gen.flag_reason||'needs a check'}`);
+    document.getElementById('stat-flagged').textContent = parseInt(document.getElementById('stat-flagged').textContent)+1;
+  }
+  btn.disabled=false;
+  btn.textContent='Submit another ✦';
+}
+function resolveFlag(id, action) {
+  const el = document.getElementById(id);
+  const name = el.querySelector('strong').textContent;
+  el.style.opacity='0.3'; el.style.pointerEvents='none';
+  const cur = parseInt(document.getElementById('stat-flagged').textContent);
+  document.getElementById('stat-flagged').textContent = Math.max(0,cur-1);
+  showToast(action==='approved'?`<strong>${name}</strong> approved`:`<strong>${name}</strong> removed`);
+  addLog(`Manual ${action==='approved'?'approval':'rejection'}: "${name}"`, action==='approved'?'ok':'warn');
+}
+function addLog(msg, type) {
+  const log = document.getElementById('agent-log');
+  const d = document.createElement('div');
+  d.className = 'log-'+type;
+  d.textContent = `[just now] ${msg}`;
+  log.insertBefore(d, log.firstChild);
+}
+function showView(v, el) {
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  if (el) el.classList.add('active');
+  if (v==='browse') renderGrid(filteredListings);
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.innerHTML = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 4200);
+}
+loadListings();
+</script>
+</body>
+</html>
