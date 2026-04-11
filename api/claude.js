@@ -15,8 +15,11 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    res.status(response.status).json(data);D
+    return res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ error: 'API request failed' });
+    console.error('Claude proxy error:', error);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'API request failed', details: error.message });
+    }
   }
 }
