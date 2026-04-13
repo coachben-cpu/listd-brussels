@@ -327,6 +327,20 @@
       <label>Website</label>
       <input type="url" id="f-website" placeholder="https://...">
     </div>
+    <div class="form-group">
+      <label>Street address *</label>
+      <input type="text" id="f-address" placeholder="e.g. Rue du Trône 42, 1050 Ixelles">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Phone number *</label>
+        <input type="tel" id="f-phone" placeholder="e.g. +32 2 123 45 67">
+      </div>
+      <div class="form-group">
+        <label>Commune / Area</label>
+        <input type="text" id="f-location" placeholder="e.g. Ixelles, Etterbeek, Woluwe">
+      </div>
+    </div>
     <div class="form-row">
       <div class="form-group">
         <label>Category hint</label>
@@ -343,13 +357,9 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Commune / Area</label>
-        <input type="text" id="f-location" placeholder="e.g. Ixelles, Etterbeek, Woluwe">
+        <label>Languages spoken</label>
+        <input type="text" id="f-languages" placeholder="e.g. English, French, Dutch">
       </div>
-    </div>
-    <div class="form-group">
-      <label>Languages spoken</label>
-      <input type="text" id="f-languages" placeholder="e.g. English, French, Dutch">
     </div>
     <div class="form-group">
       <label>Extra details (optional)</label>
@@ -511,6 +521,10 @@ async function runSearch() {
 async function submitListing() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { showToast('Please enter a business name'); return; }
+  const address = document.getElementById('f-address').value.trim();
+  if (!address) { showToast('Please enter a street address'); return; }
+  const phone = document.getElementById('f-phone').value.trim();
+  if (!phone) { showToast('Please enter a phone number'); return; }
   const website = document.getElementById('f-website').value.trim();
   const category = document.getElementById('f-category').value;
   const location = document.getElementById('f-location').value.trim();
@@ -542,9 +556,14 @@ async function submitListing() {
     const res = await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       model:'claude-sonnet-4-20250514',max_tokens:1000,
       system:`You are the AI listing engine for Listd, a directory of English-speaking businesses in Brussels serving the expat community. Write descriptions that specifically highlight value for internationals and expats (English service, international insurance, cross-border expertise, etc.) when relevant. Output ONLY valid JSON (no markdown, no backticks):
-{"name":"cleaned name","category":"one of: Healthcare, Legal & Admin, Finance & Tax, Housing & Relocation, Schools & Childcare, Home Services, Wellness & Beauty, Dining & Social, Other","emoji":"one relevant emoji","desc":"2 specific benefit-focused sentences for an expat reader. Mention English service or any expat-relevant detail if provided.","tags":["tag1","tag2","tag3"],"approved":true,"flag_reason":null}
-Always include at least one language tag (e.g. "english") in tags when languages are known. Set approved=false only for obvious spam or inappropriate content.`,
-      messages:[{role:'user',content:JSON.stringify({name,website,category,location,languages,notes})}]
+{"name":"cleaned name with proper capitalisation","category":"one of: Healthcare, Legal & Admin, Finance & Tax, Housing & Relocation, Schools & Childcare, Home Services, Wellness & Beauty, Dining & Social, Other","emoji":"one relevant emoji","desc":"2 specific benefit-focused sentences for an expat reader. Mention English service or any expat-relevant detail if provided.","tags":["tag1","tag2","tag3"],"approved":true,"flag_reason":null}
+Rules for moderation — set approved=false and explain in flag_reason if ANY of these apply:
+1. Street address is missing, vague (just a city or commune name), or clearly not a real Brussels address
+2. Phone number is missing, too short, or clearly fake (e.g. 000000, 123456)
+3. Business name and description are completely contradictory or make no sense together — flag with reason "name/description mismatch — please verify"
+4. Submission looks like spam, gibberish, or has no legitimate business purpose
+Otherwise set approved=true. Do not flag for minor issues. Always include at least one language tag (e.g. "english") in tags when languages are known.`,
+      messages:[{role:'user',content:JSON.stringify({name,address,phone,website,category,location,languages,notes})}]
     })});
     const d = await res.json();
     gen = JSON.parse(d.content?.[0]?.text?.replace(/```json|```/g,'').trim()||'{}');
@@ -559,7 +578,7 @@ Always include at least one language tag (e.g. "english") in tags when languages
   if (gen.approved!==false) {
     const { error: dbErr } = await db.from('listings').insert({
       name: gen.name||name, category: gen.category||'Other', emoji: gen.emoji||'🏢',
-      description: gen.desc||'', tags: gen.tags||[], location: location||'Brussels',
+      description: gen.desc||'', tags: gen.tags||[], location: location||address||'Brussels',
       featured: false, is_new: true, approved: true,
     });
     if (dbErr) console.error('Supabase insert error:', dbErr);
